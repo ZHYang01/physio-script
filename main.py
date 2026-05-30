@@ -1,8 +1,29 @@
 import multiprocessing
+import os
 import queue
 import sys
 import time
 from pathlib import Path
+
+# ── Qt platform plugin path (must be set before any Qt imports) ──
+# In a frozen .app bundle the plugin is at Contents/Frameworks/PyQt6/...
+def _setup_qt_plugins():
+    if not getattr(sys, "frozen", False):
+        return
+    from pathlib import Path
+    macos_dir = Path(sys.executable).parent
+    contents_dir = macos_dir.parent
+    candidates = [
+        contents_dir / "Frameworks" / "PyQt6" / "Qt6" / "plugins",
+        contents_dir / "Resources" / "PyQt6" / "Qt6" / "plugins",
+        macos_dir / "PyQt6" / "Qt6" / "plugins",
+    ]
+    for p in candidates:
+        if (p / "platforms" / "libqcocoa.dylib").exists():
+            os.environ["QT_PLUGIN_PATH"] = str(p)
+            os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = str(p / "platforms")
+            return
+_setup_qt_plugins()
 
 from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QFont, QKeySequence, QShortcut, QTextCursor

@@ -23,20 +23,20 @@ for _pkg in ('faster_whisper', 'ctranslate2', 'onnxruntime', 'tokenizers', 'av')
     _fw_binaries += _b
     _fw_hidden += _h
 
+# PyQt6 native binaries — collect_all ensures all Qt6 frameworks, plugins, and
+# their @rpath links are bundled. The Qt6 platform plugins must be from the real
+# PyQt6 installation, NOT Qt5 copies from another package.
+_qt6_datas, _qt6_binaries, _qt6_hidden = collect_all('PyQt6')
+
 a = Analysis(
     [str(ROOT / 'main.py')],
     pathex=[str(ROOT)],
     binaries=[
         ('/opt/homebrew/lib/libportaudio.dylib', '.'),
-    ] + _fw_binaries,
+    ] + _fw_binaries + _qt6_binaries,
     datas=[
         (str(ROOT / 'prompts'), 'prompts'),
-        # Qt plugins are bundled automatically by PyInstaller's PyQt6 hook
-        # (which also fixes their @rpath links). Do NOT copy them manually —
-        # a raw copy leaves the platform plugins unable to find the Qt
-        # frameworks and the app fails with "Could not find the Qt platform
-        # plugin 'cocoa'".
-    ] + _fw_datas,
+    ] + _fw_datas + _qt6_datas,
     hiddenimports=[
         'pyaudio',
         'PyQt6.QtCore',
@@ -46,10 +46,9 @@ a = Analysis(
         'pyperclip',
         'dotenv',
         'numpy',
-    ] + _fw_hidden,
+    ] + _fw_hidden + _qt6_hidden,
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[str(ROOT / 'qt_hook.py')],
     excludes=[
         'tkinter',
         'matplotlib',
