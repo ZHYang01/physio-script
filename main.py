@@ -4,8 +4,8 @@ import sys
 import time
 from pathlib import Path
 
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, pyqtSlot
-from PyQt6.QtGui import QFont, QTextCursor
+from PyQt6.QtCore import Qt, QTimer, QThread, pyqtSignal, pyqtSlot
+from PyQt6.QtGui import QFont, QKeySequence, QShortcut, QTextCursor
 from PyQt6.QtWidgets import (
     QApplication,
     QGroupBox,
@@ -215,6 +215,9 @@ class MainWindow(QMainWindow):
         self._ollama_available = False
         self._whisper_ready = False
         self.whisper_preload_worker = None
+        self._recording_start_time = 0.0
+        self._recording_timer = QTimer()
+        self._recording_timer.timeout.connect(self._update_recording_time)
 
         self._build_ui()
         self._preload_whisper_model()
@@ -232,6 +235,14 @@ class MainWindow(QMainWindow):
         self.status_label = QLabel("Ready")
         self.status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #555;")
         top_bar.addWidget(self.status_label)
+
+        # Recording duration timer
+        self.timer_label = QLabel("00:00")
+        self.timer_label.setStyleSheet(
+            "font-size: 18px; font-weight: bold; color: #b2bec3; font-family: 'SF Mono', Menlo, monospace;"
+        )
+        self.timer_label.setVisible(False)
+        top_bar.addWidget(self.timer_label)
 
         top_bar.addStretch()
 
@@ -268,7 +279,8 @@ class MainWindow(QMainWindow):
         left_layout.addWidget(QLabel("Live Transcript"))
 
         self.transcript_edit = QPlainTextEdit()
-        self.transcript_edit.setReadOnly(True)
+        self.transcript_edit.setReadOnly(False)
+        self.transcript_edit.textChanged.connect(self._on_transcript_edited)
         self.transcript_edit.setPlaceholderText(
             "Transcript will appear here as you speak...\n\n"
             "1. Click 'Start Recording' to begin\n"
@@ -292,7 +304,7 @@ class MainWindow(QMainWindow):
         right_layout.addWidget(QLabel("SOAP Note"))
 
         self.soap_edit = QPlainTextEdit()
-        self.soap_edit.setReadOnly(True)
+        self.soap_edit.textChanged.connect(self._on_soap_edited)
         self.soap_edit.setPlaceholderText(
             "SOAP note will appear here after transcription...\n\n"
             "Generated notes follow the format:\n"
@@ -335,6 +347,11 @@ class MainWindow(QMainWindow):
 
         main_layout.addLayout(actions_layout)
 
+        # Keyboard shortcuts
+        QShortcut(QKeySequence("Ctrl+R"), self, self.toggle_recording)
+        QShortcut(QKeySequence("Ctrl+Return"), self, self._generate_soap)
+        QShortcut(QKeySequence("Ctrl+Shift+C"), self, self._copy_to_clipboard)
+
         self._apply_stylesheet()
 
     # ── Recording ──
@@ -373,6 +390,10 @@ class MainWindow(QMainWindow):
         self.record_btn.setStyleSheet(self._record_btn_style(True))
         self.status_label.setText("Recording...")
         self.status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #c0392b;")
+        self.timer_label.setText("00:00")
+        self.timer_label.setVisible(True)
+        self._recording_start_time = time.time()
+        self._recording_timer.start(1000)
 
         # Background transcription worker (one per recording session)
         self._stop_transcription_worker()
@@ -395,6 +416,8 @@ class MainWindow(QMainWindow):
 
         self.record_btn.setText("●  Start Recording")
         self.record_btn.setStyleSheet(self._record_btn_style(False))
+        self._recording_timer.stop()
+        self.timer_label.setVisible(False)
         self.status_label.setText("Processing transcription...")
         self.status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #2980b9;")
         # If the mic captured nothing, no chunk signals will ever arrive, so
@@ -425,11 +448,13 @@ class MainWindow(QMainWindow):
     @pyqtSlot(str)
     def _on_text_ready(self, text: str):
         self.full_transcript += " " + text
-        self.transcript_edit.setPlainText(self.full_transcript.strip())
-        # Auto-scroll to bottom
-        cursor = self.transcript_edit.textCursor()
-        cursor.movePosition(QTextCursor.MoveOperation.End)
-        self.transcript_edit.setTextCursor(cursor)
+        # Only auto-update the display during active recording.
+        # After stopping, the user may be editing, so don't overwrite.
+        if self.is_recording:
+            self.transcript_edit.setPlainText(self.full_transcript.strip())
+            cursor = self.transcript_edit.textCursor()
+            cursor.movePosition(QTextCursor.MoveOperation.End)
+            self.transcript_edit.setTextCursor(cursor)
 
     @pyqtSlot()
     def _on_chunk_transcribed(self):
@@ -478,7 +503,8 @@ class MainWindow(QMainWindow):
     # ── SOAP Generation ──
 
     def _generate_soap(self):
-        if not self.full_transcript.strip():
+        transcript_text = self.transcript_edit.toPlainText().strip()
+        if not transcript_text:
             return
 
         if not self._ollama_available:
@@ -491,10 +517,11 @@ class MainWindow(QMainWindow):
             return
 
         self.generate_btn.setEnabled(False)
+        self.generate_btn.setText("Generating SOAP Note...")
         self.status_label.setText("Generating SOAP note...")
         self.status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #8e44ad;")
 
-        self.soap_thread = SummarizationThread(self.ollama, self.full_transcript.strip())
+        self.soap_thread = SummarizationThread(self.ollama, transcript_text)
         self.soap_thread.note_ready.connect(self._on_soap_ready)
         self.soap_thread.error.connect(self._on_soap_error)
         self.soap_thread.start()
@@ -504,6 +531,7 @@ class MainWindow(QMainWindow):
         self.soap_edit.setPlainText(note)
         self.copy_btn.setEnabled(True)
         self.generate_btn.setEnabled(True)
+        self.generate_btn.setText("Generate SOAP Note")
         self.status_label.setText("SOAP note generated successfully.")
         self.status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #27ae60;")
 
@@ -511,6 +539,7 @@ class MainWindow(QMainWindow):
         self.status_label.setText("Error generating SOAP note.")
         self.status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #c0392b;")
         self.generate_btn.setEnabled(True)
+        self.generate_btn.setText("Generate SOAP Note")
         QMessageBox.warning(self, "Error", msg)
 
     # ── Clipboard ──
@@ -538,6 +567,16 @@ class MainWindow(QMainWindow):
             self.transcription_worker = None
 
     def _clear_all(self):
+        if self.full_transcript.strip() or self.soap_note.strip():
+            reply = QMessageBox.question(
+                self,
+                "Clear All",
+                "This will discard the current transcript and SOAP note. Continue?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+
         if self.is_recording:
             self._stop_recording()
         self._stop_transcription_worker()
@@ -550,10 +589,27 @@ class MainWindow(QMainWindow):
         self._chunks_transcribed = 0
         self.generate_btn.setEnabled(False)
         self.copy_btn.setEnabled(False)
+        self.timer_label.setVisible(False)
+        self._recording_timer.stop()
         self.status_label.setText("Ready")
         self.status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #555;")
 
     # ── Helpers ──
+
+    @pyqtSlot()
+    def _on_transcript_edited(self):
+        """Keep self.full_transcript in sync when the user edits the transcript box."""
+        self.full_transcript = self.transcript_edit.toPlainText()
+
+    @pyqtSlot()
+    def _on_soap_edited(self):
+        """Keep self.soap_note in sync when the user edits the SOAP note box."""
+        self.soap_note = self.soap_edit.toPlainText()
+
+    def _update_recording_time(self):
+        """Update the recording timer label every second."""
+        elapsed = int(time.time() - self._recording_start_time)
+        self.timer_label.setText(f"{elapsed // 60:02d}:{elapsed % 60:02d}")
 
     def _preload_whisper_model(self):
         """Kick off background loading of the local Whisper model."""
@@ -618,19 +674,6 @@ class MainWindow(QMainWindow):
     def _apply_stylesheet(self):
         self.setStyleSheet("""
             QMainWindow { background-color: #f5f6fa; }
-            QGroupBox {
-                font-weight: bold;
-                border: 1px solid #dcdde1;
-                border-radius: 6px;
-                margin-top: 10px;
-                padding-top: 15px;
-                background: white;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 12px;
-                padding: 0 6px;
-            }
             QLabel { font-size: 13px; color: #2d3436; }
             QPlainTextEdit {
                 border: 1px solid #dcdde1;
@@ -640,19 +683,6 @@ class MainWindow(QMainWindow):
                 color: #2d3436;
                 selection-background-color: #74b9ff;
                 selection-color: white;
-            }
-            QLineEdit, QComboBox { color: #2d3436; }
-            QLineEdit {
-                border: 1px solid #dcdde1;
-                border-radius: 4px;
-                padding: 6px;
-                background: white;
-            }
-            QComboBox {
-                border: 1px solid #dcdde1;
-                border-radius: 4px;
-                padding: 6px;
-                background: white;
             }
             QPushButton {
                 border: none;
