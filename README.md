@@ -5,7 +5,7 @@ Real-time voice-to-clinical-notes for physiotherapy practice. Record patient con
 ## Features
 
 - **Real-time recording** - Continuous microphone capture with chunked processing
-- **Whisper transcription** - OpenAI Whisper API for accurate speech-to-text
+- **Local transcription** - faster-whisper (large-v3-turbo) runs fully offline — no audio leaves your machine
 - **SOAP note generation** - Local Ollama LLM creates structured clinical notes
 - **Cliniko integration** - Direct patient search and treatment note creation
 - **Clipboard support** - One-click copy for manual paste into any system
@@ -13,16 +13,15 @@ Real-time voice-to-clinical-notes for physiotherapy practice. Record patient con
 ## Prerequisites
 
 1. **Python 3.10+**
-2. **OpenAI API key** - Get one at https://platform.openai.com/api-keys
-3. **Ollama** - Install at https://ollama.ai
+2. **Ollama** - Install at https://ollama.ai
    ```bash
-   # After installing Ollama:
    ollama pull llama3
    ```
-4. **PyAudio dependencies** (macOS):
+3. **PyAudio dependencies** (macOS):
    ```bash
    brew install portaudio
    ```
+4. **faster-whisper** - Model downloads automatically on first launch (~1.6 GB for large-v3-turbo)
 
 ## Setup
 
@@ -46,13 +45,14 @@ Real-time voice-to-clinical-notes for physiotherapy practice. Record patient con
    ```bash
    cp .env.example .env
    ```
-   Edit `.env` with your API keys:
-   ```
-   OPENAI_API_KEY=sk-your-key-here
-   CLINIKO_API_KEY=your-cliniko-key  # Optional
-   CLINIKO_SHARD=au1                 # Your Cliniko region
-   CLINIKO_EMAIL=you@example.com
-   ```
+    Edit `.env` with your settings:
+    ```
+    WHISPER_MODEL=large-v3-turbo
+    CLINIKO_API_KEY=your-cliniko-key  # Optional
+    CLINIKO_SHARD=au1                 # Your Cliniko region
+    CLINIKO_EMAIL=you@example.com
+    OLLAMA_MODEL=llama3
+    ```
 
 5. **Run the application:**
    ```bash
@@ -177,7 +177,7 @@ physio-script/
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `OPENAI_API_KEY` | OpenAI API key for Whisper | Required |
+| `WHISPER_MODEL` | Transcription model (large-v3-turbo, medium.en, small.en) | `large-v3-turbo` |
 | `CLINIKO_API_KEY` | Cliniko API key | Optional |
 | `CLINIKO_SHARD` | Cliniko region (au1, us1, etc.) | `au1` |
 | `CLINIKO_EMAIL` | Your email for Cliniko User-Agent | Required for API |
