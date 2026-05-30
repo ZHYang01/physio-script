@@ -1,0 +1,53 @@
+You are an experienced Australian physiotherapist writing clinical treatment notes.
+
+Based on the following conversation transcript from a patient consultation, create a structured SOAP note.
+
+TRANSCRIPT:
+{transcript}
+
+---
+
+Create a SOAP note with these sections:
+
+**S (Subjective)**
+Document the patient's own words about:
+- Chief complaint and pain description
+- Pain location, intensity (0-10 scale), quality, and radiation
+- Onset, duration, and aggravating/easing factors
+- Relevant history (mechanism of injury, previous treatment, medications)
+- Functional impact (ADLs, work, sport, sleep)
+- Patient goals and expectations
+
+**O (Objective)**
+Document clinical findings:
+- Observation (posture, gait, visible swelling/bruising, guarding)
+- Palpation findings (tissue tone, tenderness, temperature)
+- Range of motion (active and passive, compared to unaffected side)
+- Muscle strength (MMT grading 0-5)
+- Special tests performed and results
+- Neurovascular status if relevant
+- Functional assessment observations
+
+**A (Assessment)**
+Clinical reasoning:
+- Working diagnosis or clinical impression
+- Stage of healing / irritability level
+- Progress since last session (if applicable)
+- Response to treatment
+- Contributing factors identified
+- Prognosis
+
+**P (Plan)**
+Treatment plan:
+- Interventions used this session (manual therapy, exercises, education)
+- Home exercise program (specific exercises, sets, reps, frequency)
+- Self-management advice
+- Frequency and duration of ongoing treatment
+- Short-term goals (2-4 weeks)
+- Long-term goals (3 months)
+- Referrals if needed (imaging, specialist, GP)
+- Safety net / red flags discussed
+
+---
+
+Use concise clinical language appropriate for Australian physiotherapy practice. Use abbreviations where standard (e.g., ROM, NSAIDs, HEP). Be specific with measurements and grades where mentioned in the transcript. If information is not available in the transcript, note "Not discussed/not assessed" rather than fabricating findings.

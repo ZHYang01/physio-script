@@ -1,0 +1,22 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+venv/
+.venv/
+.build-venv/
+*.wav
+*.mp3
+*.egg-info/
+dist/
+build/
+.DS_Store
+
+# PyInstaller
+*.spec.bak
+
+# Build artifacts
+*.dmg
+*.app
+.claude/
+.build-venv/
