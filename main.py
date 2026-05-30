@@ -8,11 +8,9 @@ from PyQt6.QtCore import Qt, QThread, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QFont, QTextCursor
 from PyQt6.QtWidgets import (
     QApplication,
-    QComboBox,
     QGroupBox,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
     QMainWindow,
     QMessageBox,
     QPlainTextEdit,
@@ -25,7 +23,6 @@ from PyQt6.QtWidgets import (
 
 from audio.recorder import AudioRecorder
 from clipboard.manager import ClipboardManager
-from cliniko.client import ClinikoClient
 from config.settings import Settings
 from summarization.ollama import OllamaSummarizer
 from transcription.whisper import WhisperTranscriber
@@ -204,11 +201,6 @@ class MainWindow(QMainWindow):
             base_url=Settings.OLLAMA_BASE_URL,
             model=Settings.OLLAMA_MODEL,
         )
-        self.cliniko = ClinikoClient(
-            api_key=Settings.CLINIKO_API_KEY,
-            shard=Settings.CLINIKO_SHARD,
-            email=Settings.CLINIKO_EMAIL,
-        )
         self.clipboard = ClipboardManager()
 
         # State
@@ -265,27 +257,6 @@ class MainWindow(QMainWindow):
         top_bar.addWidget(self.record_btn)
 
         main_layout.addLayout(top_bar)
-
-        # ── Patient Selector ──
-        patient_group = QGroupBox("Patient")
-        patient_layout = QHBoxLayout(patient_group)
-
-        patient_layout.addWidget(QLabel("Name:"))
-        self.patient_search = QLineEdit()
-        self.patient_search.setPlaceholderText("Search patient name...")
-        self.patient_search.setMaximumWidth(300)
-        patient_layout.addWidget(self.patient_search)
-
-        self.patient_combo = QComboBox()
-        self.patient_combo.setMinimumWidth(250)
-        patient_layout.addWidget(self.patient_combo)
-
-        self.search_btn = QPushButton("Search")
-        self.search_btn.clicked.connect(self._search_patients)
-        patient_layout.addWidget(self.search_btn)
-
-        patient_layout.addStretch()
-        main_layout.addWidget(patient_group)
 
         # ── Splitter: Transcript | SOAP Note ──
         splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -354,13 +325,6 @@ class MainWindow(QMainWindow):
         self.copy_btn.clicked.connect(self._copy_to_clipboard)
         actions_layout.addWidget(self.copy_btn)
 
-        # Push to Cliniko
-        self.cliniko_btn = QPushButton("Push to Cliniko")
-        self.cliniko_btn.setEnabled(False)
-        self.cliniko_btn.setFixedHeight(40)
-        self.cliniko_btn.clicked.connect(self._push_to_cliniko)
-        actions_layout.addWidget(self.cliniko_btn)
-
         actions_layout.addStretch()
 
         # Clear button
@@ -404,7 +368,6 @@ class MainWindow(QMainWindow):
         self.soap_edit.clear()
         self.generate_btn.setEnabled(False)
         self.copy_btn.setEnabled(False)
-        self.cliniko_btn.setEnabled(False)
 
         self.record_btn.setText("■  Stop Recording")
         self.record_btn.setStyleSheet(self._record_btn_style(True))
@@ -540,7 +503,6 @@ class MainWindow(QMainWindow):
         self.soap_note = note
         self.soap_edit.setPlainText(note)
         self.copy_btn.setEnabled(True)
-        self.cliniko_btn.setEnabled(Settings.is_cliniko_configured())
         self.generate_btn.setEnabled(True)
         self.status_label.setText("SOAP note generated successfully.")
         self.status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #27ae60;")
@@ -562,88 +524,9 @@ class MainWindow(QMainWindow):
                     "font-size: 14px; font-weight: bold; color: #27ae60;"
                 )
 
-    # ── Cliniko Push ──
 
-    def _push_to_cliniko(self):
-        if not self.soap_note:
-            return
 
-        if not Settings.is_cliniko_configured():
-            QMessageBox.warning(
-                self,
-                "Cliniko Not Configured",
-                "Please set CLINIKO_API_KEY and CLINIKO_SHARD in your .env file.",
-            )
-            return
 
-        # Get selected patient
-        patient_data = self.patient_combo.currentData()
-        if not patient_data:
-            QMessageBox.warning(
-                self,
-                "No Patient Selected",
-                "Please search and select a patient first.",
-            )
-            return
-
-        patient_id = patient_data.get("id")
-        if not patient_id:
-            QMessageBox.warning(self, "Error", "Invalid patient data.")
-            return
-
-        reply = QMessageBox.question(
-            self,
-            "Push to Cliniko",
-            f"Create treatment note for patient:\n{patient_data.get('first_name', '')} "
-            f"{patient_data.get('last_name', '')}?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-
-        if reply == QMessageBox.StandardButton.Yes:
-            result = self.cliniko.create_soap_note(
-                patient_id=patient_id,
-                soap_text=self.soap_note,
-            )
-            if result:
-                self.status_label.setText("Note pushed to Cliniko successfully!")
-                self.status_label.setStyleSheet(
-                    "font-size: 14px; font-weight: bold; color: #27ae60;"
-                )
-                QMessageBox.information(
-                    self, "Success", "Treatment note created in Cliniko."
-                )
-            else:
-                self.status_label.setText("Failed to push to Cliniko.")
-                self.status_label.setStyleSheet(
-                    "font-size: 14px; font-weight: bold; color: #c0392b;"
-                )
-                QMessageBox.warning(self, "Error", "Failed to create note in Cliniko.")
-
-    # ── Patient Search ──
-
-    def _search_patients(self):
-        if not Settings.is_cliniko_configured():
-            QMessageBox.information(
-                self,
-                "Cliniko Not Configured",
-                "Set CLINIKO_API_KEY in .env to enable patient search.\n"
-                "You can still use voice recording and SOAP generation.",
-            )
-            return
-
-        search = self.patient_search.text().strip()
-        if not search:
-            return
-
-        self.patient_combo.clear()
-        patients = self.cliniko.get_patients(search=search)
-
-        for p in patients:
-            name = f"{p.get('first_name', '')} {p.get('last_name', '')}".strip()
-            self.patient_combo.addItem(name, p)
-
-        if not patients:
-            self.patient_combo.addItem("No patients found", None)
 
     # ── Clear ──
 
@@ -667,7 +550,6 @@ class MainWindow(QMainWindow):
         self._chunks_transcribed = 0
         self.generate_btn.setEnabled(False)
         self.copy_btn.setEnabled(False)
-        self.cliniko_btn.setEnabled(False)
         self.status_label.setText("Ready")
         self.status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #555;")
 

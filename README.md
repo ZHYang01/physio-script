@@ -7,7 +7,7 @@ Real-time voice-to-clinical-notes for physiotherapy practice. Record patient con
 - **Real-time recording** - Continuous microphone capture with chunked processing
 - **Local transcription** - faster-whisper (large-v3-turbo) runs fully offline — no audio leaves your machine
 - **SOAP note generation** - Local Ollama LLM creates structured clinical notes
-- **Cliniko integration** - Direct patient search and treatment note creation
+- **Cliniko-ready** - Treatment note format compatible with Cliniko paste
 - **Clipboard support** - One-click copy for manual paste into any system
 
 ## Prerequisites
