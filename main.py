@@ -49,6 +49,154 @@ from summarization.ollama import OllamaSummarizer
 from transcription.whisper import WhisperTranscriber
 
 
+# ── Theme System ───────────────────────────────────────────────────
+
+class Theme:
+    """Color palette and styling that switches between dark and light modes."""
+
+    def __init__(self, dark: bool):
+        if dark:
+            self.bg = "#0d1117"
+            self.card = "#161b22"
+            self.border = "#30363d"
+            self.text = "#e6edf3"
+            self.text_muted = "#8b949e"
+            self.accent = "#58a6ff"
+            self.accent_hover = "#79c0ff"
+            self.green = "#3fb950"
+            self.red = "#f85149"
+            self.amber = "#d2991d"
+            self.record_btn = "#da3633"
+            self.record_btn_text = "#ffffff"
+            self.panel_header = "#e6edf3"
+            self.btn_disabled_bg = "#21262d"
+            self.btn_disabled_text = "#484f58"
+            self.btn_bg = "#21262d"
+            self.btn_text = "#c9d1d9"
+            self.btn_hover_bg = "#30363d"
+            self.btn_primary_bg = "#238636"
+            self.btn_primary_hover = "#2ea043"
+            self.btn_primary_text = "#ffffff"
+            self.timer_color = "#8b949e"
+            self.timer_recording_color = "#f85149"
+            self.splitter_handle = "#30363d"
+            self.scrollbar_bg = "#161b22"
+            self.scrollbar_handle = "#30363d"
+            self.selection_bg = "#264f78"
+            self.chip_bg = "#161b22"
+            self.chip_border = "#30363d"
+            self.focus_border = "#58a6ff"
+            self.count_color = "#6e7681"
+        else:
+            self.bg = "#f6f8fa"
+            self.card = "#ffffff"
+            self.border = "#d0d7de"
+            self.text = "#1f2328"
+            self.text_muted = "#656d76"
+            self.accent = "#0969da"
+            self.accent_hover = "#0550ae"
+            self.green = "#1a7f37"
+            self.red = "#cf222e"
+            self.amber = "#9a6700"
+            self.record_btn = "#cf222e"
+            self.record_btn_text = "#ffffff"
+            self.panel_header = "#1f2328"
+            self.btn_disabled_bg = "#eaeef2"
+            self.btn_disabled_text = "#8c959f"
+            self.btn_bg = "#f6f8fa"
+            self.btn_text = "#24292f"
+            self.btn_hover_bg = "#eaeef2"
+            self.btn_primary_bg = "#1f883d"
+            self.btn_primary_hover = "#1a7f37"
+            self.btn_primary_text = "#ffffff"
+            self.timer_color = "#656d76"
+            self.timer_recording_color = "#cf222e"
+            self.splitter_handle = "#d0d7de"
+            self.scrollbar_bg = "#f6f8fa"
+            self.scrollbar_handle = "#d0d7de"
+            self.selection_bg = "#c2dbff"
+            self.chip_bg = "#ffffff"
+            self.chip_border = "#d0d7de"
+            self.focus_border = "#0969da"
+            self.count_color = "#8c959f"
+
+    @property
+    def stylesheet(self) -> str:
+        return f"""
+            QMainWindow {{ background-color: {self.bg}; }}
+            QLabel {{ color: {self.text}; }}
+            QMenuBar {{
+                background-color: {self.card};
+                color: {self.text};
+                border-bottom: 1px solid {self.border};
+            }}
+            QPlainTextEdit {{
+                border: 1px solid {self.border};
+                border-radius: 8px;
+                padding: 12px;
+                background-color: {self.card};
+                color: {self.text};
+                font-size: 14px;
+                font-family: -apple-system, 'Helvetica Neue', sans-serif;
+                line-height: 1.6;
+                selection-background-color: {self.selection_bg};
+            }}
+            QPlainTextEdit:focus {{
+                border: 1px solid {self.focus_border};
+            }}
+            QPlainTextEdit::placeholder {{
+                color: {self.text_muted};
+            }}
+            QPushButton {{
+                border: 1px solid {self.border};
+                padding: 8px 20px;
+                border-radius: 18px;
+                font-size: 13px;
+                font-weight: 600;
+                background-color: {self.btn_bg};
+                color: {self.btn_text};
+            }}
+            QPushButton:hover {{
+                background-color: {self.btn_hover_bg};
+            }}
+            QPushButton:disabled {{
+                background-color: {self.btn_disabled_bg};
+                color: {self.btn_disabled_text};
+                border-color: {self.btn_disabled_bg};
+            }}
+            QSplitter::handle {{
+                background-color: {self.splitter_handle};
+                width: 2px;
+            }}
+            QScrollBar:vertical {{
+                background: {self.scrollbar_bg};
+                width: 10px;
+                border-radius: 5px;
+            }}
+            QScrollBar::handle:vertical {{
+                background: {self.scrollbar_handle};
+                border-radius: 5px;
+                min-height: 30px;
+            }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                height: 0;
+            }}
+        """
+
+
+def _detect_system_theme() -> bool:
+    """Return True for dark mode, False for light mode."""
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["defaults", "read", "-g", "AppleInterfaceStyle"],
+            capture_output=True, text=True, timeout=2,
+        )
+        return result.returncode == 0
+    except Exception:
+        return True  # default dark
+
+
 # ── Worker Threads ──────────────────────────────────────────────
 
 
@@ -204,8 +352,11 @@ class SummarizationThread(QThread):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Physio Script - Voice to Clinical Notes")
-        self.setMinimumSize(1100, 750)
+        self.setWindowTitle("Physio Script")
+        self.setMinimumSize(1100, 700)
+
+        # Theme
+        self.theme = Theme(dark=_detect_system_theme())
 
         # Core components
         self.recorder = AudioRecorder(
@@ -244,136 +395,182 @@ class MainWindow(QMainWindow):
         self._preload_whisper_model()
 
     def _build_ui(self):
+        t = self.theme
         central = QWidget()
         self.setCentralWidget(central)
         main_layout = QVBoxLayout(central)
-        main_layout.setSpacing(10)
-        main_layout.setContentsMargins(12, 12, 12, 12)
+        main_layout.setSpacing(12)
+        main_layout.setContentsMargins(16, 16, 16, 16)
 
-        # ── Top Bar: Status + Record Button ──
+        # ── Top Bar ──
         top_bar = QHBoxLayout()
+        top_bar.setSpacing(10)
 
-        self.status_label = QLabel("Ready")
-        self.status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #555;")
-        top_bar.addWidget(self.status_label)
+        # App title with subtle subtitle
+        title_box = QVBoxLayout()
+        title_box.setSpacing(0)
+        title = QLabel("Physio Script")
+        title.setStyleSheet(f"font-size: 17px; font-weight: 700; color: {t.text};")
+        subtitle = QLabel("Voice → SOAP notes · fully on-device")
+        subtitle.setStyleSheet(f"font-size: 11px; color: {t.text_muted};")
+        title_box.addWidget(title)
+        title_box.addWidget(subtitle)
+        top_bar.addLayout(title_box)
+        top_bar.addSpacing(16)
 
-        # Recording duration timer
+        # Status chips (dot + label inside a rounded pill)
+        self.whisper_dot, self.whisper_status_label, whisper_chip = self._make_status_chip("Transcription")
+        self.ollama_dot, self.ollama_status_label, ollama_chip = self._make_status_chip("Ollama")
+        top_bar.addWidget(whisper_chip)
+        top_bar.addWidget(ollama_chip)
+        top_bar.addStretch()
+
+        # Recording timer
         self.timer_label = QLabel("00:00")
         self.timer_label.setStyleSheet(
-            "font-size: 18px; font-weight: bold; color: #b2bec3; font-family: 'SF Mono', Menlo, monospace;"
+            f"font-size: 20px; font-weight: 700; color: {t.timer_color}; "
+            "font-family: 'SF Mono', Menlo, monospace;"
         )
         self.timer_label.setVisible(False)
         top_bar.addWidget(self.timer_label)
 
-        top_bar.addStretch()
-
-        # Local transcription model status
-        self.whisper_status = QLabel()
-        self._set_whisper_status("loading")
-        top_bar.addWidget(self.whisper_status)
-
-        # Ollama status indicator (polled in the background)
-        self.ollama_status = QLabel()
-        self._update_ollama_status(False)
-        top_bar.addWidget(self.ollama_status)
-
-        self.ollama_status_worker = OllamaStatusWorker(self.ollama)
-        self.ollama_status_worker.status_changed.connect(self._update_ollama_status)
-        self.ollama_status_worker.start()
-
-        # Record / Stop button
-        self.record_btn = QPushButton("●  Start Recording")
-        self.record_btn.setFixedSize(200, 44)
-        self.record_btn.setStyleSheet(self._record_btn_style(False))
+        # Record button (pill)
+        self.record_btn = QPushButton("Start Recording")
+        self.record_btn.setFixedSize(160, 40)
         self.record_btn.clicked.connect(self.toggle_recording)
+        self._apply_record_btn_style(False)
         top_bar.addWidget(self.record_btn)
 
         main_layout.addLayout(top_bar)
 
+        # Thin separator line
+        sep = QWidget()
+        sep.setFixedHeight(1)
+        sep.setStyleSheet(f"background-color: {t.border};")
+        main_layout.addWidget(sep)
+
         # ── Splitter: Transcript | SOAP Note ──
         splitter = QSplitter(Qt.Orientation.Horizontal)
 
-        # Left: Live Transcript
         left_panel = QWidget()
         left_layout = QVBoxLayout(left_panel)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.addWidget(QLabel("Live Transcript"))
+        left_layout.setContentsMargins(0, 4, 0, 0)
+        left_layout.setSpacing(6)
+
+        trans_header_row = QHBoxLayout()
+        trans_header = QLabel("Transcript")
+        trans_header.setStyleSheet(f"font-size: 13px; font-weight: 600; color: {t.panel_header};")
+        self.transcript_count = QLabel("")
+        self.transcript_count.setStyleSheet(f"font-size: 11px; color: {t.count_color};")
+        trans_header_row.addWidget(trans_header)
+        trans_header_row.addStretch()
+        trans_header_row.addWidget(self.transcript_count)
+        left_layout.addLayout(trans_header_row)
 
         self.transcript_edit = QPlainTextEdit()
         self.transcript_edit.setReadOnly(False)
         self.transcript_edit.textChanged.connect(self._on_transcript_edited)
         self.transcript_edit.setPlaceholderText(
             "Transcript will appear here as you speak...\n\n"
-            "1. Click 'Start Recording' to begin\n"
-            "2. Speak with your patient\n"
-            "3. Click 'Stop Recording' when done\n"
-            "4. Transcript will be transcribed automatically"
+            "Start Recording → speak → Stop → transcript appears automatically.\n"
+            "You can edit the text here before generating the SOAP note."
         )
-        self.transcript_edit.setStyleSheet("font-size: 13px; line-height: 1.5;")
         left_layout.addWidget(self.transcript_edit)
-
-        self.transcript_progress = QProgressBar()
-        self.transcript_progress.setVisible(False)
-        left_layout.addWidget(self.transcript_progress)
-
         splitter.addWidget(left_panel)
 
-        # Right: SOAP Note
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.addWidget(QLabel("SOAP Note"))
+        right_layout.setContentsMargins(0, 4, 0, 0)
+        right_layout.setSpacing(6)
+
+        soap_header_row = QHBoxLayout()
+        soap_header = QLabel("SOAP Note")
+        soap_header.setStyleSheet(f"font-size: 13px; font-weight: 600; color: {t.panel_header};")
+        self.soap_count = QLabel("")
+        self.soap_count.setStyleSheet(f"font-size: 11px; color: {t.count_color};")
+        soap_header_row.addWidget(soap_header)
+        soap_header_row.addStretch()
+        soap_header_row.addWidget(self.soap_count)
+        right_layout.addLayout(soap_header_row)
 
         self.soap_edit = QPlainTextEdit()
         self.soap_edit.textChanged.connect(self._on_soap_edited)
         self.soap_edit.setPlaceholderText(
-            "SOAP note will appear here after transcription...\n\n"
-            "Generated notes follow the format:\n"
-            "S (Subjective) - Patient's complaints & history\n"
-            "O (Objective) - Clinical findings & measurements\n"
-            "A (Assessment) - Clinical reasoning & diagnosis\n"
-            "P (Plan) - Treatment plan & exercises"
+            "SOAP note will appear here after generation...\n\n"
+            "S (Subjective)\n"
+            "O (Objective)\n"
+            "A (Assessment)\n"
+            "P (Plan)"
         )
-        self.soap_edit.setStyleSheet("font-size: 13px; line-height: 1.5;")
         right_layout.addWidget(self.soap_edit)
-
         splitter.addWidget(right_panel)
         splitter.setSizes([500, 500])
-        main_layout.addWidget(splitter)
+        splitter.setHandleWidth(8)
+        # Let the panels absorb all extra vertical space (no dead zone at bottom).
+        main_layout.addWidget(splitter, stretch=1)
 
         # ── Bottom Actions ──
         actions_layout = QHBoxLayout()
+        actions_layout.setSpacing(8)
 
-        # Generate SOAP button
         self.generate_btn = QPushButton("Generate SOAP Note")
         self.generate_btn.setEnabled(False)
-        self.generate_btn.setFixedHeight(40)
+        self.generate_btn.setFixedHeight(36)
         self.generate_btn.clicked.connect(self._generate_soap)
-        actions_layout.addWidget(self.generate_btn)
+        self._style_primary_btn(self.generate_btn, False)
 
-        # Copy to clipboard
         self.copy_btn = QPushButton("Copy to Clipboard")
         self.copy_btn.setEnabled(False)
-        self.copy_btn.setFixedHeight(40)
+        self.copy_btn.setFixedHeight(36)
         self.copy_btn.clicked.connect(self._copy_to_clipboard)
-        actions_layout.addWidget(self.copy_btn)
 
+        actions_layout.addWidget(self.generate_btn)
+        actions_layout.addWidget(self.copy_btn)
         actions_layout.addStretch()
 
-        # Clear button
         self.clear_btn = QPushButton("Clear All")
-        self.clear_btn.setFixedHeight(40)
+        self.clear_btn.setFixedHeight(36)
         self.clear_btn.clicked.connect(self._clear_all)
+        # Subtle danger styling
+        self.clear_btn.setStyleSheet(
+            f"QPushButton {{ background-color: transparent; border: 1px solid {t.border}; "
+            f"color: {t.text_muted}; border-radius: 18px; padding: 6px 16px; font-size: 12px; }}"
+            f"QPushButton:hover {{ color: {t.red}; border-color: {t.red}; }}"
+        )
         actions_layout.addWidget(self.clear_btn)
 
         main_layout.addLayout(actions_layout)
+
+        # ── Footer: status (left) + shortcut hints (right) ──
+        footer_sep = QWidget()
+        footer_sep.setFixedHeight(1)
+        footer_sep.setStyleSheet(f"background-color: {t.border};")
+        main_layout.addWidget(footer_sep)
+
+        footer = QHBoxLayout()
+        self.status_label = QLabel("Ready")
+        self.status_label.setStyleSheet(f"font-size: 12px; color: {t.text_muted};")
+        hints = QLabel("⌘R Record   ⌘↩ Generate   ⌘⇧C Copy")
+        hints.setStyleSheet(f"font-size: 11px; color: {t.count_color};")
+        footer.addWidget(self.status_label)
+        footer.addStretch()
+        footer.addWidget(hints)
+        main_layout.addLayout(footer)
+
+        self._apply_stylesheet()
 
         # Keyboard shortcuts
         QShortcut(QKeySequence("Ctrl+R"), self, self.toggle_recording)
         QShortcut(QKeySequence("Ctrl+Return"), self, self._generate_soap)
         QShortcut(QKeySequence("Ctrl+Shift+C"), self, self._copy_to_clipboard)
 
-        self._apply_stylesheet()
+        # Background status workers
+        self.ollama_status_worker = OllamaStatusWorker(self.ollama)
+        self.ollama_status_worker.status_changed.connect(self._update_ollama_status)
+        self.ollama_status_worker.start()
+
+        self._set_whisper_status("loading")
+        self._update_ollama_status(False)
 
     # ── Recording ──
 
@@ -394,8 +591,6 @@ class MainWindow(QMainWindow):
                 "instant. You can start recording — transcription will begin as "
                 "soon as the model is ready.",
             )
-            # Don't hard-block: recording is still useful; chunks queue up and
-            # transcribe once the model finishes loading.
 
         self.is_recording = True
         self.audio_chunks = []
@@ -407,16 +602,21 @@ class MainWindow(QMainWindow):
         self.generate_btn.setEnabled(False)
         self.copy_btn.setEnabled(False)
 
-        self.record_btn.setText("■  Stop Recording")
-        self.record_btn.setStyleSheet(self._record_btn_style(True))
-        self.status_label.setText("Recording...")
-        self.status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #c0392b;")
+        self._apply_record_btn_style(True)
         self.timer_label.setText("00:00")
         self.timer_label.setVisible(True)
         self._recording_start_time = time.time()
         self._recording_timer.start(1000)
 
-        # Background transcription worker (one per recording session)
+        # Pulsing dot
+        self._pulse_dot_visible = True
+        self._pulse_timer = QTimer()
+        self._pulse_timer.timeout.connect(self._pulse_recording_dot)
+        self._pulse_timer.start(600)
+
+        self._update_status("Recording", self.theme.red)
+
+        # Background transcription worker
         self._stop_transcription_worker()
         self.transcription_worker = TranscriptionWorker(self.whisper)
         self.transcription_worker.text_ready.connect(self._on_text_ready)
@@ -429,18 +629,28 @@ class MainWindow(QMainWindow):
         self.recording_thread.error.connect(self._on_recording_error)
         self.recording_thread.start()
 
+    def _pulse_recording_dot(self):
+        if not self.is_recording:
+            return
+        # Pulse a ● glyph in the button label between solid and dim for a
+        # clear "live" indication.
+        dot = "●" if self._pulse_dot_visible else "○"
+        self.record_btn.setText(f"{dot}  Stop Recording")
+        self._pulse_dot_visible = not self._pulse_dot_visible
+
     def _stop_recording(self):
         self.is_recording = False
         if self.recording_thread:
             self.recording_thread.stop()
             self.recording_thread.wait(5000)
 
-        self.record_btn.setText("●  Start Recording")
-        self.record_btn.setStyleSheet(self._record_btn_style(False))
+        if hasattr(self, "_pulse_timer") and self._pulse_timer:
+            self._pulse_timer.stop()
+
+        self._apply_record_btn_style(False)
         self._recording_timer.stop()
         self.timer_label.setVisible(False)
-        self.status_label.setText("Processing transcription...")
-        self.status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #2980b9;")
+        self._update_status("Processing transcription...", self.theme.accent)
         # If the mic captured nothing, no chunk signals will ever arrive, so
         # finalize here to surface the problem instead of hanging on "Processing".
         self._maybe_finish_transcription()
@@ -452,10 +662,8 @@ class MainWindow(QMainWindow):
         if self.recording_thread:
             self.recording_thread.stop()
         self._stop_transcription_worker()
-        self.record_btn.setText("●  Start Recording")
-        self.record_btn.setStyleSheet(self._record_btn_style(False))
-        self.status_label.setText("Microphone error.")
-        self.status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #c0392b;")
+        self._apply_record_btn_style(False)
+        self._update_status("Microphone error. " + msg, self.theme.red)
         QMessageBox.critical(self, "Microphone Error", msg)
 
     @pyqtSlot(Path)
@@ -494,17 +702,12 @@ class MainWindow(QMainWindow):
             return
         if self.full_transcript.strip():
             self.generate_btn.setEnabled(True)
-            self.status_label.setText("Recording complete. Ready to generate SOAP note.")
-            self.status_label.setStyleSheet(
-                "font-size: 14px; font-weight: bold; color: #27ae60;"
-            )
+            self._style_primary_btn(self.generate_btn, False)
+            self._update_status("Recording complete. Ready to generate SOAP note.", self.theme.green)
         elif self._chunks_queued == 0:
             # Mic opened but delivered no audio at all — almost always a
             # macOS microphone-permission issue for this app.
-            self.status_label.setText("No audio captured — check microphone permission.")
-            self.status_label.setStyleSheet(
-                "font-size: 14px; font-weight: bold; color: #c0392b;"
-            )
+            self._update_status("No audio captured — check microphone permission.", self.theme.red)
             QMessageBox.warning(
                 self,
                 "No Audio Captured",
@@ -516,10 +719,7 @@ class MainWindow(QMainWindow):
                 "microphone is selected and its level moves when you speak.",
             )
         else:
-            self.status_label.setText("No speech detected. Try recording again.")
-            self.status_label.setStyleSheet(
-                "font-size: 14px; font-weight: bold; color: #c0392b;"
-            )
+            self._update_status("No speech detected. Try recording again.", self.theme.red)
 
     # ── SOAP Generation ──
 
@@ -538,9 +738,9 @@ class MainWindow(QMainWindow):
             return
 
         self.generate_btn.setEnabled(False)
-        self.generate_btn.setText("Generating SOAP Note...")
-        self.status_label.setText("Generating SOAP note...")
-        self.status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #8e44ad;")
+        self.generate_btn.setText("Generating...")
+        self._style_primary_btn(self.generate_btn, True)
+        self._update_status("Generating SOAP note...", self.theme.amber)
 
         self.soap_thread = SummarizationThread(self.ollama, transcript_text)
         self.soap_thread.note_ready.connect(self._on_soap_ready)
@@ -553,30 +753,29 @@ class MainWindow(QMainWindow):
         self.copy_btn.setEnabled(True)
         self.generate_btn.setEnabled(True)
         self.generate_btn.setText("Generate SOAP Note")
-        self.status_label.setText("SOAP note generated successfully.")
-        self.status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #27ae60;")
+        self._style_primary_btn(self.generate_btn, False)
+        self._update_status("SOAP note generated successfully.", self.theme.green)
 
-    def _on_soap_error(self, msg: str):
-        self.status_label.setText("Error generating SOAP note.")
-        self.status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #c0392b;")
-        self.generate_btn.setEnabled(True)
-        self.generate_btn.setText("Generate SOAP Note")
-        QMessageBox.warning(self, "Error", msg)
+
+
+
 
     # ── Clipboard ──
 
     def _copy_to_clipboard(self):
-        if self.soap_note:
-            success = self.clipboard.copy_soap_note(self.soap_note)
-            if success:
-                self.status_label.setText("SOAP note copied to clipboard!")
-                self.status_label.setStyleSheet(
-                    "font-size: 14px; font-weight: bold; color: #27ae60;"
-                )
+        soap_text = self.soap_edit.toPlainText().strip()
+        if soap_text:
+            self.clipboard.copy_soap_note(soap_text)
+            self._update_status("SOAP note copied to clipboard!", self.theme.green)
 
+    # ── SOAP Error ──
 
-
-
+    def _on_soap_error(self, msg: str):
+        self.generate_btn.setEnabled(True)
+        self.generate_btn.setText("Generate SOAP Note")
+        self._style_primary_btn(self.generate_btn, False)
+        self._update_status("Error generating SOAP note.", self.theme.red)
+        QMessageBox.warning(self, "Error", msg)
 
     # ── Clear ──
 
@@ -612,25 +811,45 @@ class MainWindow(QMainWindow):
         self.copy_btn.setEnabled(False)
         self.timer_label.setVisible(False)
         self._recording_timer.stop()
-        self.status_label.setText("Ready")
-        self.status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #555;")
+        self._update_status("Ready", self.theme.text_muted)
 
     # ── Helpers ──
+
+    @staticmethod
+    def _count_text(s: str) -> str:
+        s = s.strip()
+        if not s:
+            return ""
+        words = len(s.split())
+        return f"{words} word{'s' if words != 1 else ''}"
 
     @pyqtSlot()
     def _on_transcript_edited(self):
         """Keep self.full_transcript in sync when the user edits the transcript box."""
         self.full_transcript = self.transcript_edit.toPlainText()
+        self.transcript_count.setText(self._count_text(self.full_transcript))
 
     @pyqtSlot()
     def _on_soap_edited(self):
         """Keep self.soap_note in sync when the user edits the SOAP note box."""
         self.soap_note = self.soap_edit.toPlainText()
+        self.soap_count.setText(self._count_text(self.soap_note))
 
     def _update_recording_time(self):
         """Update the recording timer label every second."""
         elapsed = int(time.time() - self._recording_start_time)
         self.timer_label.setText(f"{elapsed // 60:02d}:{elapsed % 60:02d}")
+        # Pulse between muted and red for visual feedback
+        if elapsed % 2 == 0:
+            self.timer_label.setStyleSheet(
+                f"font-size: 20px; font-weight: 700; color: {self.theme.timer_recording_color}; "
+                "font-family: 'SF Mono', Menlo, monospace;"
+            )
+        else:
+            self.timer_label.setStyleSheet(
+                f"font-size: 20px; font-weight: 700; color: {self.theme.timer_color}; "
+                "font-family: 'SF Mono', Menlo, monospace;"
+            )
 
     def _preload_whisper_model(self):
         """Kick off background loading of the local Whisper model."""
@@ -653,79 +872,82 @@ class MainWindow(QMainWindow):
 
     def _set_whisper_status(self, state: str):
         """state: 'loading' | 'ready' | 'error'"""
-        styles = {
-            "loading": ("Transcription: loading…", "#f39c12"),
-            "ready": ("Transcription: local ✓", "#27ae60"),
-            "error": ("Transcription: error", "#c0392b"),
-        }
-        text, color = styles.get(state, styles["loading"])
-        self.whisper_status.setText(text)
-        self.whisper_status.setStyleSheet(
-            f"font-size: 12px; color: {color}; margin-right: 12px;"
+        t = self.theme
+        dot_c = {"loading": t.amber, "ready": t.green, "error": t.red}.get(state, t.amber)
+        label = {"loading": "Loading model…", "ready": "Local model", "error": "Model error"}
+        self.whisper_dot.setStyleSheet(
+            f"border-radius: 4px; border: none; background-color: {dot_c};"
         )
+        self.whisper_status_label.setText(label.get(state, "Local model"))
 
     @pyqtSlot(bool)
     def _update_ollama_status(self, available: bool):
         self._ollama_available = available
-        if available:
-            self.ollama_status.setText("Ollama: Connected")
-            self.ollama_status.setStyleSheet(
-                "font-size: 12px; color: #27ae60; margin-right: 10px;"
+        t = self.theme
+        dot_c = t.green if available else t.red
+        label_text = "Ollama" if available else "Ollama off"
+        self.ollama_dot.setStyleSheet(
+            f"border-radius: 4px; border: none; background-color: {dot_c};"
+        )
+        self.ollama_status_label.setText(label_text)
+
+    def _update_status(self, text: str, color: str):
+        self.status_label.setText(text)
+        self.status_label.setStyleSheet(f"font-size: 12px; color: {color};")
+
+    def _make_status_chip(self, text: str):
+        """Build a rounded status chip: [• label]. Returns (dot, label, chip)."""
+        t = self.theme
+        chip = QWidget()
+        chip.setStyleSheet(
+            f"background-color: {t.chip_bg}; border: 1px solid {t.chip_border}; "
+            "border-radius: 11px;"
+        )
+        lay = QHBoxLayout(chip)
+        lay.setContentsMargins(10, 4, 12, 4)
+        lay.setSpacing(6)
+        dot = QLabel()
+        dot.setFixedSize(8, 8)
+        dot.setStyleSheet(f"border-radius: 4px; background-color: {t.text_muted};")
+        label = QLabel(text)
+        label.setStyleSheet(f"font-size: 11px; font-weight: 600; color: {t.text_muted}; border: none;")
+        lay.addWidget(dot)
+        lay.addWidget(label)
+        return dot, label, chip
+
+    def _apply_record_btn_style(self, recording: bool):
+        t = self.theme
+        if recording:
+            self.record_btn.setText("Stop Recording")
+            self.record_btn.setStyleSheet(
+                f"QPushButton {{ background-color: {t.record_btn}; color: {t.record_btn_text}; "
+                f"border-radius: 20px; font-size: 14px; font-weight: 600; border: none; }}"
+                f"QPushButton:hover {{ background-color: {t.record_btn}; }}"
             )
         else:
-            self.ollama_status.setText("Ollama: Disconnected")
-            self.ollama_status.setStyleSheet(
-                "font-size: 12px; color: #c0392b; margin-right: 10px;"
+            self.record_btn.setText("Start Recording")
+            self.record_btn.setStyleSheet(
+                f"QPushButton {{ background-color: {t.btn_primary_bg}; color: {t.btn_primary_text}; "
+                f"border-radius: 20px; font-size: 14px; font-weight: 600; border: none; }}"
+                f"QPushButton:hover {{ background-color: {t.btn_primary_hover}; }}"
             )
 
-    @staticmethod
-    def _record_btn_style(recording: bool) -> str:
-        if recording:
-            return (
-                "QPushButton { background-color: #c0392b; color: white; font-weight: bold; "
-                "border-radius: 6px; font-size: 14px; }"
-                "QPushButton:hover { background-color: #e74c3c; }"
+    def _style_primary_btn(self, btn: QPushButton, disabled: bool):
+        t = self.theme
+        if disabled:
+            btn.setStyleSheet(
+                f"QPushButton {{ background-color: {t.btn_disabled_bg}; color: {t.btn_disabled_text}; "
+                f"border-radius: 18px; font-size: 13px; font-weight: 600; border: 1px solid {t.border}; }}"
             )
-        return (
-            "QPushButton { background-color: #27ae60; color: white; font-weight: bold; "
-            "border-radius: 6px; font-size: 14px; }"
-            "QPushButton:hover { background-color: #2ecc71; }"
-        )
+        else:
+            btn.setStyleSheet(
+                f"QPushButton {{ background-color: {t.btn_primary_bg}; color: {t.btn_primary_text}; "
+                f"border-radius: 18px; font-size: 13px; font-weight: 600; border: none; }}"
+                f"QPushButton:hover {{ background-color: {t.btn_primary_hover}; }}"
+            )
 
     def _apply_stylesheet(self):
-        self.setStyleSheet("""
-            QMainWindow { background-color: #f5f6fa; }
-            QLabel { font-size: 13px; color: #2d3436; }
-            QPlainTextEdit {
-                border: 1px solid #dcdde1;
-                border-radius: 6px;
-                padding: 8px;
-                background: white;
-                color: #2d3436;
-                selection-background-color: #74b9ff;
-                selection-color: white;
-            }
-            QPushButton {
-                border: none;
-                padding: 8px 16px;
-                border-radius: 4px;
-                font-size: 13px;
-            }
-            QPushButton:disabled {
-                background-color: #b2bec3;
-                color: #dfe6e9;
-            }
-            QProgressBar {
-                border: 1px solid #dcdde1;
-                border-radius: 4px;
-                text-align: center;
-                height: 20px;
-            }
-            QProgressBar::chunk {
-                background-color: #0984e3;
-                border-radius: 3px;
-            }
-        """)
+        self.setStyleSheet(self.theme.stylesheet)
 
     def closeEvent(self, event):
         if self.recording_thread:
